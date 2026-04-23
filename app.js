@@ -457,7 +457,6 @@ function wireInputs(clubId, monthId) {
       const nextValue = Number(event.target.value) || 0;
       appState.data[clubId][monthId][field] = nextValue;
       persistState();
-      renderApp();
     });
   });
 }
@@ -893,7 +892,8 @@ function sharedChartOptions() {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 0 },
+    resizeDelay: 0,
+    animation: false,
     plugins: {
       legend: {
         labels: {
