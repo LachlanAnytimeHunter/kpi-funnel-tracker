@@ -616,8 +616,8 @@ function renderSettings() {
       <section class="settings-club">
         <h3>${club.name}</h3>
         <div class="field">
-          <label for="csv-${club.id}">Published Sheet URL</label>
-          <input id="csv-${club.id}" type="url" value="${config.csvUrl}" data-setting-club="${club.id}" data-setting-field="csvUrl" placeholder="https://docs.google.com/spreadsheets/d/e/.../pubhtml">
+          <label for="csv-${club.id}">Published CSV URL</label>
+          <input id="csv-${club.id}" type="url" value="${config.csvUrl}" data-setting-club="${club.id}" data-setting-field="csvUrl" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv">
         </div>
         <div class="field">
           <label for="mapping-${club.id}">Members Mapping</label>
@@ -684,42 +684,76 @@ async function syncAllSheets() {
 }
 
 async function fetchCsvRows(url) {
-  // Normalise URL: accept both pubhtml and pub?output=csv, always fetch as HTML
-  const htmlUrl = url
-    .replace(/pub\?output=csv.*$/, "pubhtml")
-    .replace(/pubhtml.*$/, "pubhtml");
+  // Convert any pubhtml URL to csv format for direct fetch
+  const csvUrl = url
+    .replace(/pubhtml.*$/, "pub?output=csv")
+    .replace(/pub\?output=csv.*$/, "pub?output=csv");
 
-  const response = await fetch(htmlUrl);
+  // Use a CORS proxy to get around Google Sheets cross-origin blocking
+  const proxy = "https://corsproxy.io/?";
+  const response = await fetch(proxy + encodeURIComponent(csvUrl));
   if (!response.ok) {
     throw new Error(`Unable to fetch sheet (${response.status})`);
   }
   const text = await response.text();
-  return parseSheetHtml(text);
+  return parseCsv(text);
 }
 
-function parseSheetHtml(html) {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, "text/html");
-  const table = doc.querySelector("table");
-  if (!table) {
+async function fetchCsvRows_UNUSED_HTML(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Unable to fetch CSV (${response.status})`);
+  }
+  const text = await response.text();
+  return parseCsv(text);
+}
+
+function parseCsv(csvText) {
+  const lines = csvText.split(/\r?\n/).filter(Boolean);
+  if (!lines.length) {
     return [];
   }
-
-  const rows = Array.from(table.querySelectorAll("tr"));
-  if (rows.length < 2) {
-    return [];
-  }
-
-  const headers = Array.from(rows[0].querySelectorAll("th, td"))
-    .map((cell) => cell.textContent.trim());
-
-  return rows.slice(1).map((row) => {
-    const cells = Array.from(row.querySelectorAll("th, td"));
-    return headers.reduce((obj, header, index) => {
-      obj[header] = (cells[index] ? cells[index].textContent.trim() : "");
-      return obj;
+  const headers = splitCsvLine(lines[0]).map((item) => item.trim());
+  return lines.slice(1).map((line) => {
+    const values = splitCsvLine(line);
+    return headers.reduce((row, header, index) => {
+      row[header] = values[index] || "";
+      return row;
     }, {});
-  }).filter((row) => Object.values(row).some((v) => v !== ""));
+  });
+}
+
+function splitCsvLine(line) {
+  const values = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    const nextChar = line[index + 1];
+
+    if (char === '"' && inQuotes && nextChar === '"') {
+      current += '"';
+      index += 1;
+      continue;
+    }
+
+    if (char === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+
+    if (char === "," && !inQuotes) {
+      values.push(current);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  values.push(current);
+  return values;
 }
 
 function mergeSheetRowsIntoState(clubId, rows, config) {
