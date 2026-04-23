@@ -617,7 +617,7 @@ function renderSettings() {
         <h3>${club.name}</h3>
         <div class="field">
           <label for="csv-${club.id}">Published CSV URL</label>
-          <input id="csv-${club.id}" type="url" value="${config.csvUrl}" data-setting-club="${club.id}" data-setting-field="csvUrl" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv">
+          <input id="csv-${club.id}" type="url" value="${config.csvUrl}" data-setting-club="${club.id}" data-setting-field="csvUrl" placeholder="Paste pubhtml or CSV link from File → Publish to web">
         </div>
         <div class="field">
           <label for="mapping-${club.id}">Members Mapping</label>
@@ -662,50 +662,93 @@ async function syncAllSheets() {
   button.disabled = true;
   button.textContent = "Syncing...";
 
-  try {
-    for (const club of CLUBS) {
-      const config = appState.sheetSettings[club.id];
-      if (!config.csvUrl) {
+  const errors = [];
+  let synced = 0;
+
+  for (const club of CLUBS) {
+    const config = appState.sheetSettings[club.id];
+    if (!config.csvUrl) {
+      continue;
+    }
+    flashSaveStatus(`Syncing ${club.name}…`);
+    try {
+      const rows = await fetchCsvRows(config.csvUrl);
+      if (!rows.length) {
+        errors.push(`${club.name}: sheet returned no rows — check the URL and that the sheet is published as CSV.`);
         continue;
       }
-      const rows = await fetchCsvRows(config.csvUrl);
       mergeSheetRowsIntoState(club.id, rows, config);
+      synced += 1;
+    } catch (error) {
+      errors.push(`${club.name}: ${error.message}`);
     }
+  }
+
+  if (synced > 0) {
     persistState();
     renderApp();
-    flashSaveStatus("Sheets synced");
-  } catch (error) {
-    flashSaveStatus("Sync failed");
-    window.alert(`Sheet sync failed: ${error.message}`);
-  } finally {
-    button.disabled = false;
-    button.textContent = "Sync From Sheets";
   }
+
+  if (errors.length) {
+    flashSaveStatus(`Synced ${synced}, ${errors.length} failed`);
+    window.alert(`Sync issues:\n\n${errors.join("\n\n")}`);
+  } else if (synced === 0) {
+    flashSaveStatus("Nothing to sync");
+    window.alert("No URLs configured. Open Sheet Settings and paste each club's published CSV URL.");
+  } else {
+    flashSaveStatus(`Synced ${synced} club${synced > 1 ? "s" : ""} ✓`);
+  }
+
+  button.disabled = false;
+  button.textContent = "Sync From Sheets";
+}
+
+function normalizeSheetUrl(url) {
+  const trimmed = url.trim();
+
+  // Extract gid if present (e.g. pubhtml?gid=12345&... or #gid=12345)
+  const gidMatch = trimmed.match(/[?&#]gid=(\d+)/);
+  const gid = gidMatch ? gidMatch[1] : null;
+
+  // Strip everything from /pub onwards, then rebuild cleanly
+  const base = trimmed.replace(/\/pub(html)?.*$/, "/pub");
+
+  let csvUrl = `${base}?output=csv&single=true`;
+  if (gid) {
+    csvUrl += `&gid=${gid}`;
+  }
+  return csvUrl;
 }
 
 async function fetchCsvRows(url) {
-  // Convert any pubhtml URL to csv format for direct fetch
-  const csvUrl = url
-    .replace(/pubhtml.*$/, "pub?output=csv")
-    .replace(/pub\?output=csv.*$/, "pub?output=csv");
+  const csvUrl = normalizeSheetUrl(url);
 
-  // Use a CORS proxy to get around Google Sheets cross-origin blocking
-  const proxy = "https://corsproxy.io/?";
-  const response = await fetch(proxy + encodeURIComponent(csvUrl));
-  if (!response.ok) {
-    throw new Error(`Unable to fetch sheet (${response.status})`);
-  }
-  const text = await response.text();
-  return parseCsv(text);
-}
+  // Try multiple CORS proxies in order until one works
+  const proxies = [
+    (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
+    (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    (u) => `https://thingproxy.freeboard.io/fetch/${u}`
+  ];
 
-async function fetchCsvRows_UNUSED_HTML(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Unable to fetch CSV (${response.status})`);
+  let lastError = null;
+  for (const buildProxyUrl of proxies) {
+    try {
+      const response = await fetch(buildProxyUrl(csvUrl));
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const text = await response.text();
+      // Sanity-check: if we got back HTML instead of CSV, try next proxy
+      if (text.trim().startsWith("<")) {
+        throw new Error("Received HTML instead of CSV — proxy may have returned an error page");
+      }
+      return parseCsv(text);
+    } catch (error) {
+      lastError = error;
+    }
   }
-  const text = await response.text();
-  return parseCsv(text);
+
+  throw new Error(`All proxies failed. Last error: ${lastError?.message}. Make sure the sheet is published (File → Share → Publish to web → CSV).`);
 }
 
 function parseCsv(csvText) {
