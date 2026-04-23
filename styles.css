@@ -139,7 +139,8 @@ h1 {
 
 .hero-card, .card, .chart-card, .settings-card { padding: 20px; }
 .hero-card { padding: 24px; }
-.chart-card canvas { width: 100%; height: 280px; }
+.chart-card canvas { width: 100% !important; height: 280px !important; max-height: 280px; }
+.chart-card .chart-wrap { position: relative; height: 280px; width: 100%; }
 
 .card-header {
   display: flex;
@@ -206,6 +207,7 @@ h1 {
   justify-content: flex-end;
   background: rgba(0, 0, 0, 0.62);
   z-index: 30;
+  overflow: hidden;
 }
 
 .settings-card {
@@ -214,6 +216,8 @@ h1 {
   border-radius: 0;
   padding: 28px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
 .settings-copy { margin: 14px 0 22px; color: var(--muted); line-height: 1.6; }

@@ -232,7 +232,7 @@ function renderGroupView() {
               <p class="card-copy">Sales funnel volume for ${getMonthLabel(appState.activeMonth)}.</p>
             </div>
           </div>
-          <canvas id="group-funnel-chart"></canvas>
+          <div class="chart-wrap"><canvas id="group-funnel-chart"></canvas></div>
         </article>
         <article class="chart-card">
           <div class="card-header">
@@ -241,7 +241,7 @@ function renderGroupView() {
               <p class="card-copy">Total sales across the full 2026 view.</p>
             </div>
           </div>
-          <canvas id="group-trend-chart"></canvas>
+          <div class="chart-wrap"><canvas id="group-trend-chart"></canvas></div>
         </article>
         <article class="chart-card">
           <div class="card-header">
@@ -250,7 +250,7 @@ function renderGroupView() {
               <p class="card-copy">Selected month sales by club.</p>
             </div>
           </div>
-          <canvas id="group-comparison-chart"></canvas>
+          <div class="chart-wrap"><canvas id="group-comparison-chart"></canvas></div>
         </article>
       </section>
     </div>
@@ -330,7 +330,7 @@ function renderClubTotals(club) {
             <p class="card-copy">Year-to-date monthly sales performance.</p>
           </div>
         </div>
-        <canvas id="club-total-trend-${club.id}"></canvas>
+        <div class="chart-wrap"><canvas id="club-total-trend-${club.id}"></canvas></div>
       </article>
       <article class="chart-card">
         <div class="card-header">
@@ -339,7 +339,7 @@ function renderClubTotals(club) {
             <p class="card-copy">Annual average conversion profile.</p>
           </div>
         </div>
-        <canvas id="club-total-conversion-${club.id}"></canvas>
+        <div class="chart-wrap"><canvas id="club-total-conversion-${club.id}"></canvas></div>
       </article>
     </section>
   `;
@@ -425,7 +425,7 @@ function renderClubMonth(club) {
               <p class="card-copy">Lead to sale volume for ${getMonthLabel(appState.activeMonth)}.</p>
             </div>
           </div>
-          <canvas id="club-funnel-${club.id}"></canvas>
+          <div class="chart-wrap"><canvas id="club-funnel-${club.id}"></canvas></div>
         </article>
         <article class="chart-card">
           <div class="card-header">
@@ -434,7 +434,7 @@ function renderClubMonth(club) {
               <p class="card-copy">Sales across all 2026 tabs for ${club.name}.</p>
             </div>
           </div>
-          <canvas id="club-trend-${club.id}"></canvas>
+          <div class="chart-wrap"><canvas id="club-trend-${club.id}"></canvas></div>
         </article>
         <article class="chart-card">
           <div class="card-header">
@@ -443,7 +443,7 @@ function renderClubMonth(club) {
               <p class="card-copy">A quick read on the current conversion profile.</p>
             </div>
           </div>
-          <canvas id="club-conversion-${club.id}"></canvas>
+          <div class="chart-wrap"><canvas id="club-conversion-${club.id}"></canvas></div>
         </article>
       </section>
     </section>
@@ -893,6 +893,7 @@ function sharedChartOptions() {
   return {
     responsive: true,
     maintainAspectRatio: false,
+    animation: { duration: 0 },
     plugins: {
       legend: {
         labels: {
