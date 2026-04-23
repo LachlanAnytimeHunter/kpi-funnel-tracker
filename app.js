@@ -27,8 +27,7 @@ const DEFAULT_INPUTS = {
   appointmentsBooked: 0,
   appointmentsCompleted: 0,
   totalAppointments: 0,
-  monthlySalesTarget: 0,
-  revenue: 0
+  monthlySalesTarget: 0
 };
 
 const DEFAULT_SHEET_SETTINGS = CLUBS.reduce((acc, club) => {
@@ -36,8 +35,7 @@ const DEFAULT_SHEET_SETTINGS = CLUBS.reduce((acc, club) => {
     csvUrl: "",
     membersMapping: "sales",
     monthColumn: "",
-    membersColumn: "",
-    incomeColumn: ""
+    membersColumn: ""
   };
   return acc;
 }, {});
@@ -152,25 +150,18 @@ function renderGroupView() {
   groupViewEl.innerHTML = `
     <div class="panel-grid">
       <section class="hero-card">
-        <div class="hero-grid">
-          <div class="section-stack">
-            <div class="card-header">
-              <div>
-                <p class="eyebrow">Group Overview</p>
-                <h2 class="card-title">${getMonthLabel(appState.activeMonth)} Funnel Snapshot</h2>
-              </div>
-              <span class="subtle-pill">3 Clubs Combined</span>
+        <div class="section-stack">
+          <div class="card-header">
+            <div>
+              <p class="eyebrow">Group Overview</p>
+              <h2 class="card-title">${getMonthLabel(appState.activeMonth)} Funnel Snapshot</h2>
             </div>
-            <p class="card-copy">
-              Total funnel performance across Newcastle, Kotara, and Edgeworth. Local entries and any synced sheet data are blended together.
-            </p>
-            <div class="month-strip">${renderMonthButtons(appState.activeMonth)}</div>
+            <span class="subtle-pill">3 Clubs Combined</span>
           </div>
-          <div class="summary-box">
-            <div class="summary-label">Combined Revenue</div>
-            <div class="summary-value">${formatCurrency(monthData.revenue)}</div>
-            <p class="helper-text">Income synced from Google Sheets lands here when available.</p>
-          </div>
+          <p class="card-copy">
+            Total funnel performance across Newcastle, Kotara, and Edgeworth. Local entries and any synced sheet data are blended together.
+          </p>
+          <div class="month-strip">${renderMonthButtons(appState.activeMonth)}</div>
         </div>
       </section>
 
@@ -201,7 +192,6 @@ function renderGroupView() {
               <th>Lead to Sale</th>
               <th>Booked</th>
               <th>Completed</th>
-              <th>Revenue</th>
             </tr>
           </thead>
           <tbody>
@@ -216,7 +206,6 @@ function renderGroupView() {
                   <td>${formatPercent(summary.rates.leadToSale)}</td>
                   <td>${summary.appointmentsBooked}</td>
                   <td>${summary.appointmentsCompleted}</td>
-                  <td>${formatCurrency(summary.revenue)}</td>
                 </tr>
               `;
             }).join("")}
@@ -316,7 +305,6 @@ function renderClubTotals(club) {
       <div class="club-total-grid">
         ${renderSummaryMetric("Annual Sales", annual.sales)}
         ${renderSummaryMetric("Annual Leads", annual.leads)}
-        ${renderSummaryMetric("Annual Revenue", formatCurrency(annual.revenue))}
         ${renderSummaryMetric("Lead to Sale %", formatPercent(annual.rates.leadToSale))}
         ${renderSummaryMetric("Lead to Appointment %", formatPercent(annual.rates.leadToAppointment))}
         ${renderSummaryMetric("Appointment Show %", formatPercent(annual.rates.appointmentShow))}
@@ -378,7 +366,6 @@ function renderClubMonth(club) {
           ${renderInputField("appointmentsCompleted", "Appointments Completed", monthData.appointmentsCompleted)}
           ${renderInputField("totalAppointments", "Total Appointments", monthData.totalAppointments)}
           ${renderInputField("monthlySalesTarget", "Monthly Sales Target", monthData.monthlySalesTarget)}
-          ${renderInputField("revenue", "Revenue", monthData.revenue)}
         </div>
       </article>
 
@@ -562,7 +549,6 @@ function aggregateSummaries(summaries) {
     acc.appointmentsCompleted += item.appointmentsCompleted;
     acc.totalAppointments += item.totalAppointments;
     acc.monthlySalesTarget += item.monthlySalesTarget;
-    acc.revenue += item.revenue;
     return acc;
   }, { ...DEFAULT_INPUTS });
 
@@ -591,14 +577,6 @@ function divide(numerator, denominator) {
 
 function formatPercent(value) {
   return `${(value * 100).toFixed(1)}%`;
-}
-
-function formatCurrency(value) {
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    maximumFractionDigits: 0
-  }).format(value || 0);
 }
 
 function roundToSingleDecimal(value) {
@@ -633,10 +611,6 @@ function renderSettings() {
         <div class="field">
           <label for="members-${club.id}">Members Column Override</label>
           <input id="members-${club.id}" type="text" value="${config.membersColumn}" data-setting-club="${club.id}" data-setting-field="membersColumn" placeholder="Optional, e.g. Members">
-        </div>
-        <div class="field">
-          <label for="income-${club.id}">Income Column Override</label>
-          <input id="income-${club.id}" type="text" value="${config.incomeColumn}" data-setting-club="${club.id}" data-setting-field="incomeColumn" placeholder="Optional, e.g. Income">
         </div>
       </section>
     `;
@@ -807,7 +781,6 @@ function mergeSheetRowsIntoState(clubId, rows, config) {
   const headerKeys = Object.keys(rows[0]);
   const monthKey = pickHeader(headerKeys, config.monthColumn, ["month", "period", "date"]);
   const membersKey = pickHeader(headerKeys, config.membersColumn, ["members", "member", "sales", "joins"]);
-  const incomeKey = pickHeader(headerKeys, config.incomeColumn, ["income", "revenue", "amount", "takings"]);
 
   MONTHS.forEach((month) => {
     const matchingRow = rows.find((row) => normalizeMonth(row[monthKey]) === month.id);
@@ -816,15 +789,12 @@ function mergeSheetRowsIntoState(clubId, rows, config) {
     }
 
     const membersValue = parseNumber(matchingRow[membersKey]);
-    const incomeValue = parseNumber(matchingRow[incomeKey]);
 
     if (config.membersMapping === "leads") {
       appState.data[clubId][month.id].leads = membersValue;
     } else {
       appState.data[clubId][month.id].sales = membersValue;
     }
-
-    appState.data[clubId][month.id].revenue = incomeValue;
   });
 }
 
